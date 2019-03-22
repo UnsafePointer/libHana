@@ -1,5 +1,4 @@
-libHana.a:
-	go build -buildmode=c-archive -o libHana.a
+include lib.mk
 
 clean:
 	rm -rf hana
