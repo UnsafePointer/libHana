@@ -34,3 +34,7 @@
 
 # binary
 hana
+
+# libHana
+libHana.a
+libHana.h

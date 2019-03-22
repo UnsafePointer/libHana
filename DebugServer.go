@@ -1,6 +1,8 @@
+// package name: libHana
 package main
 
 import (
+	"C"
 	"bufio"
 	"bytes"
 	"fmt"
@@ -18,7 +20,8 @@ var (
 	state = Beginning
 )
 
-func startDebugServer(port uint) {
+//export StartDebugServer
+func StartDebugServer(port uint) {
 	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
 	if err != nil {
 		fmt.Println("Error listening: ", err.Error())
