@@ -5,6 +5,8 @@ package main
 #cgo CFLAGS:
 typedef unsigned int* (*GlobalRegistersCallbackType)();
 unsigned int* callGlobalRegistersCallback(GlobalRegistersCallbackType callback);
+typedef unsigned char* (*MemoryReadCallbackType)(unsigned int address, unsigned int length);
+unsigned char* callMemoryReadCallback(MemoryReadCallbackType callback, unsigned int address, unsigned int length);
 */
 import "C"
 
@@ -13,11 +15,10 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"unsafe"
 )
-
-type CallbackType func(C.uint)
 
 type ScannerState byte
 
@@ -31,11 +32,17 @@ var (
 )
 
 var globalRegistersCallback C.GlobalRegistersCallbackType
+var readMemoryCallback C.MemoryReadCallbackType
 var ackDisabled = false
 
 //export SetGlobalRegistersCallback
 func SetGlobalRegistersCallback(fn C.GlobalRegistersCallbackType) {
 	globalRegistersCallback = fn
+}
+
+//export SetReadMemoryCallback
+func SetReadMemoryCallback(fn C.MemoryReadCallbackType) {
+	readMemoryCallback = fn
 }
 
 //export StartDebugServer
@@ -151,6 +158,17 @@ func generalRegisters(conn net.Conn) {
 	send(conn, msg.String())
 }
 
+func memoryRead(address uint32, length uint32, conn net.Conn) {
+	memoryData := C.callMemoryReadCallback(readMemoryCallback, C.uint(address), C.uint(length))
+	memory := (*[1 << 28]C.uint)(unsafe.Pointer(memoryData))[:length:length]
+	var msg strings.Builder
+	for i := uint32(0); i < length; i++ {
+		value := byteToString(uint8(memory[i]))
+		msg.WriteString(value)
+	}
+	send(conn, msg.String())
+}
+
 func reply(conn net.Conn, packet string) {
 	split := strings.Split(packet, ":")
 	method := split[0]
@@ -171,6 +189,13 @@ func reply(conn net.Conn, packet string) {
 	case "g":
 		generalRegisters(conn)
 	default:
-		send(conn, "")
+		if strings.HasPrefix(method, "m") {
+			params := strings.Split(method[1:], ",")
+			address, _ := strconv.ParseUint(params[0], 10, 32)
+			length, _ := strconv.ParseUint(params[1], 10, 32)
+			memoryRead(uint32(address), uint32(length), conn)
+		} else {
+			send(conn, "")
+		}
 	}
 }
