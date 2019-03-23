@@ -31,6 +31,7 @@ var (
 )
 
 var globalRegistersCallback C.GlobalRegistersCallbackType
+var ackDisabled = false
 
 //export SetGlobalRegistersCallback
 func SetGlobalRegistersCallback(fn C.GlobalRegistersCallbackType) {
@@ -72,6 +73,9 @@ func validatePacket(packet string, checksum string) bool {
 }
 
 func ack(conn net.Conn) {
+	if ackDisabled {
+		return
+	}
 	conn.Write([]byte("+"))
 }
 
@@ -151,6 +155,19 @@ func reply(conn net.Conn, packet string) {
 	split := strings.Split(packet, ":")
 	method := split[0]
 	switch method {
+	case "qSupported":
+		send(conn, "PacketSize=3fff;QStartNoAckMode+;")
+	case "QStartNoAckMode":
+		send(conn, "OK")
+		ackDisabled = true
+	case "?":
+		send(conn, "S05")
+	case "Hc-1":
+		send(conn, "OK")
+	case "Hg0":
+		send(conn, "OK")
+	case "qOffsets":
+		send(conn, "Text=0;Data=0;Bss=0")
 	case "g":
 		generalRegisters(conn)
 	default:
