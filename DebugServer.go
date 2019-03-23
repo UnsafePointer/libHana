@@ -1,13 +1,23 @@
 // package name: libHana
 package main
 
+/*
+#cgo CFLAGS:
+typedef int* (*GlobalRegistersCallbackType)();
+int* callGlobalRegistersCallback(GlobalRegistersCallbackType callback);
+*/
+import "C"
+
 import (
-	"C"
 	"bufio"
 	"bytes"
 	"fmt"
 	"net"
+	"strings"
+	"unsafe"
 )
+
+type CallbackType func(C.int)
 
 type ScannerState byte
 
@@ -19,6 +29,13 @@ const (
 var (
 	state = Beginning
 )
+
+var globalRegistersCallback C.GlobalRegistersCallbackType
+
+//export SetGlobalRegistersCallback
+func SetGlobalRegistersCallback(fn C.GlobalRegistersCallbackType) {
+	globalRegistersCallback = fn
+}
 
 //export StartDebugServer
 func StartDebugServer(port uint) {
@@ -99,6 +116,21 @@ func send(conn net.Conn, message string) {
 	conn.Write([]byte(reply))
 }
 
+func generalRegisters(conn net.Conn) {
+	registersData := C.callGlobalRegistersCallback(globalRegistersCallback)
+	registers := (*[1 << 28]C.int)(unsafe.Pointer(registersData))[:3:3]
+	// TODO:
+	fmt.Println("Registers: ", registers)
+}
+
 func reply(conn net.Conn, packet string) {
-	send(conn, "")
+	split := strings.Split(packet, ":")
+	method := split[0]
+	switch method {
+	case "g":
+		fmt.Println("General registers")
+		generalRegisters(conn)
+	default:
+		send(conn, "")
+	}
 }
