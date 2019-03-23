@@ -116,11 +116,35 @@ func send(conn net.Conn, message string) {
 	conn.Write([]byte(reply))
 }
 
+func byteToString(b uint8) string {
+	hexValues := [16]rune{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'}
+	var msg strings.Builder
+	msg.WriteRune(hexValues[b>>4])
+	msg.WriteRune(hexValues[b&0xF])
+	return msg.String()
+}
+
+func wordToString(word uint32) string {
+	var msg strings.Builder
+	for i := uint8(0); i < 4; i++ {
+		b := uint8((word >> (i * 8)) & 0xFF)
+		msg.WriteString(byteToString(b))
+	}
+	return msg.String()
+}
+
 func generalRegisters(conn net.Conn) {
 	registersData := C.callGlobalRegistersCallback(globalRegistersCallback)
 	registers := (*[1 << 28]C.uint)(unsafe.Pointer(registersData))[:38:38]
-	// TODO:
-	fmt.Println("Registers: ", registers)
+	var msg strings.Builder
+	for i := 0; i < len(registers); i++ {
+		register := wordToString(uint32(registers[i]))
+		msg.WriteString(register)
+	}
+	for i := 38; i <= 72; i++ {
+		msg.WriteString("xxxxxxxx")
+	}
+	send(conn, msg.String())
 }
 
 func reply(conn net.Conn, packet string) {
@@ -128,7 +152,6 @@ func reply(conn net.Conn, packet string) {
 	method := split[0]
 	switch method {
 	case "g":
-		fmt.Println("General registers")
 		generalRegisters(conn)
 	default:
 		send(conn, "")
