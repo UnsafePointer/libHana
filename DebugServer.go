@@ -3,8 +3,8 @@ package main
 
 /*
 #cgo CFLAGS:
-typedef int* (*GlobalRegistersCallbackType)();
-int* callGlobalRegistersCallback(GlobalRegistersCallbackType callback);
+typedef unsigned int* (*GlobalRegistersCallbackType)();
+unsigned int* callGlobalRegistersCallback(GlobalRegistersCallbackType callback);
 */
 import "C"
 
@@ -17,7 +17,7 @@ import (
 	"unsafe"
 )
 
-type CallbackType func(C.int)
+type CallbackType func(C.uint)
 
 type ScannerState byte
 
@@ -118,7 +118,7 @@ func send(conn net.Conn, message string) {
 
 func generalRegisters(conn net.Conn) {
 	registersData := C.callGlobalRegistersCallback(globalRegistersCallback)
-	registers := (*[1 << 28]C.int)(unsafe.Pointer(registersData))[:3:3]
+	registers := (*[1 << 28]C.uint)(unsafe.Pointer(registersData))[:38:38]
 	// TODO:
 	fmt.Println("Registers: ", registers)
 }

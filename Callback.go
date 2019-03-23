@@ -2,8 +2,8 @@
 package main
 
 /*
-typedef int* (*GlobalRegistersCallbackType)();
-int* callGlobalRegistersCallback(GlobalRegistersCallbackType callback) {
+typedef unsigned int* (*GlobalRegistersCallbackType)();
+unsigned int* callGlobalRegistersCallback(GlobalRegistersCallbackType callback) {
     return (callback)();
 }
 */
