@@ -9,6 +9,8 @@ typedef unsigned char* (*MemoryReadCallbackType)(unsigned int address, unsigned 
 unsigned char* callMemoryReadCallback(MemoryReadCallbackType callback, unsigned int address, unsigned int length);
 typedef void (*AddBreakpointCallbackType)(unsigned int address);
 void callAddBreakpointCallback(AddBreakpointCallbackType callback, unsigned int address);
+typedef void (*ContinueCallbackType)();
+void callContinueCallback(ContinueCallbackType callback);
 */
 import "C"
 
@@ -31,11 +33,13 @@ const (
 
 var (
 	state = Beginning
+	done  chan struct{}
 )
 
 var globalRegistersCallback C.GlobalRegistersCallbackType
 var readMemoryCallback C.MemoryReadCallbackType
 var addBreakpointCallback C.AddBreakpointCallbackType
+var continueCallback C.ContinueCallbackType
 var ackDisabled = false
 
 //export SetGlobalRegistersCallback
@@ -53,6 +57,16 @@ func SetAddBreakpointCallback(fn C.AddBreakpointCallbackType) {
 	addBreakpointCallback = fn
 }
 
+//export SetContinueCallback
+func SetContinueCallback(fn C.ContinueCallbackType) {
+	continueCallback = fn
+}
+
+//export NotifyStopped
+func NotifyStopped() {
+	close(done)
+}
+
 //export StartDebugServer
 func StartDebugServer(port uint) {
 	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
@@ -64,9 +78,7 @@ func StartDebugServer(port uint) {
 	if err != nil {
 		fmt.Println("Error accepting: ", err.Error())
 	}
-	for {
-		handleConnection(conn)
-	}
+	go handleConnection(conn)
 }
 
 func scan(data []byte, atEOF bool) (int, []byte, error) {
@@ -99,27 +111,29 @@ func nack(conn net.Conn) {
 }
 
 func handleConnection(conn net.Conn) {
-	buf := make([]byte, 1024)
-	n, err := conn.Read(buf)
-	if err != nil {
-		return
-	}
-	scanner := bufio.NewScanner(bytes.NewReader(buf[:n]))
-	scanner.Split(scan)
-	for scanner.Scan() {
-		packet := scanner.Text()
-		switch packet {
-		case "":
-		case "+":
-		case "-":
-		default:
-			scanner.Scan()
-			checkSum := scanner.Text()
-			if validatePacket(packet, checkSum) {
-				ack(conn)
-				reply(conn, packet)
-			} else {
-				nack(conn)
+	for {
+		buf := make([]byte, 1024)
+		n, err := conn.Read(buf)
+		if err != nil {
+			return
+		}
+		scanner := bufio.NewScanner(bytes.NewReader(buf[:n]))
+		scanner.Split(scan)
+		for scanner.Scan() {
+			packet := scanner.Text()
+			switch packet {
+			case "":
+			case "+":
+			case "-":
+			default:
+				scanner.Scan()
+				checkSum := scanner.Text()
+				if validatePacket(packet, checkSum) {
+					ack(conn)
+					reply(conn, packet)
+				} else {
+					nack(conn)
+				}
 			}
 		}
 	}
@@ -189,6 +203,13 @@ func addStoreWatchpoint(address uint32) {
 
 }
 
+func continueProgram(conn net.Conn) {
+	C.callContinueCallback(continueCallback)
+	done = make(chan struct{})
+	<-done
+	send(conn, "S00")
+}
+
 func reply(conn net.Conn, packet string) {
 	split := strings.Split(packet, ":")
 	method := split[0]
@@ -209,7 +230,9 @@ func reply(conn net.Conn, packet string) {
 	case "g":
 		generalRegisters(conn)
 	default:
-		if strings.HasPrefix(method, "m") {
+		if strings.HasPrefix(method, "c") {
+			continueProgram(conn)
+		} else if strings.HasPrefix(method, "m") {
 			params := strings.Split(method[1:], ",")
 			address, _ := strconv.ParseUint(params[0], 10, 32)
 			length, _ := strconv.ParseUint(params[1], 10, 32)

@@ -14,5 +14,9 @@ typedef void (*AddBreakpointCallbackType)(unsigned int address);
 void callAddBreakpointCallback(AddBreakpointCallbackType callback, unsigned int address) {
     return (callback)(address);
 }
+typedef void (*ContinueCallbackType)();
+void callContinueCallback(ContinueCallbackType callback) {
+    return (callback)();
+}
 */
 import "C"
