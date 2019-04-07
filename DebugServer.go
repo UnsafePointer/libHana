@@ -7,6 +7,8 @@ typedef unsigned int* (*GlobalRegistersCallbackType)();
 unsigned int* callGlobalRegistersCallback(GlobalRegistersCallbackType callback);
 typedef unsigned char* (*MemoryReadCallbackType)(unsigned int address, unsigned int length);
 unsigned char* callMemoryReadCallback(MemoryReadCallbackType callback, unsigned int address, unsigned int length);
+typedef void (*AddBreakpointCallbackType)(unsigned int address);
+void callAddBreakpointCallback(AddBreakpointCallbackType callback, unsigned int address);
 */
 import "C"
 
@@ -33,6 +35,7 @@ var (
 
 var globalRegistersCallback C.GlobalRegistersCallbackType
 var readMemoryCallback C.MemoryReadCallbackType
+var addBreakpointCallback C.AddBreakpointCallbackType
 var ackDisabled = false
 
 //export SetGlobalRegistersCallback
@@ -43,6 +46,11 @@ func SetGlobalRegistersCallback(fn C.GlobalRegistersCallbackType) {
 //export SetReadMemoryCallback
 func SetReadMemoryCallback(fn C.MemoryReadCallbackType) {
 	readMemoryCallback = fn
+}
+
+//export SetAddBreakpointCallback
+func SetAddBreakpointCallback(fn C.AddBreakpointCallbackType) {
+	addBreakpointCallback = fn
 }
 
 //export StartDebugServer
@@ -169,6 +177,18 @@ func memoryRead(address uint32, length uint32, conn net.Conn) {
 	send(conn, msg.String())
 }
 
+func addBreakpoint(address uint32) {
+	C.callAddBreakpointCallback(addBreakpointCallback, C.uint(address))
+}
+
+func addLoadWatchpoint(address uint32) {
+
+}
+
+func addStoreWatchpoint(address uint32) {
+
+}
+
 func reply(conn net.Conn, packet string) {
 	split := strings.Split(packet, ":")
 	method := split[0]
@@ -194,6 +214,29 @@ func reply(conn net.Conn, packet string) {
 			address, _ := strconv.ParseUint(params[0], 10, 32)
 			length, _ := strconv.ParseUint(params[1], 10, 32)
 			memoryRead(uint32(address), uint32(length), conn)
+		} else if strings.HasPrefix(method, "Z") {
+			params := strings.Split(method[1:], ",")
+			breakType, _ := strconv.ParseUint(params[0], 10, 32)
+			address, _ := strconv.ParseUint(params[1], 16, 32)
+			kind, _ := strconv.ParseUint(params[2], 10, 32)
+			if kind != 4 {
+				// libHana only supports MIPS 32-Bits
+				// https://sourceware.org/gdb/onlinedocs/gdb/MIPS-Breakpoint-Kinds.html
+				send(conn, "E00")
+			}
+			switch breakType {
+			case 0:
+				addBreakpoint(uint32(address))
+				send(conn, "OK")
+			case 2:
+				addLoadWatchpoint(uint32(address))
+				send(conn, "OK")
+			case 3:
+				addStoreWatchpoint(uint32(address))
+				send(conn, "OK")
+			default:
+				send(conn, "")
+			}
 		} else {
 			send(conn, "")
 		}
