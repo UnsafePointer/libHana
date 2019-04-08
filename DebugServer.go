@@ -262,6 +262,7 @@ func reply(conn net.Conn, packet string) {
 				// libHana only supports MIPS 32-Bits
 				// https://sourceware.org/gdb/onlinedocs/gdb/MIPS-Breakpoint-Kinds.html
 				send(conn, "E00")
+				return
 			}
 			switch breakType {
 			case 0:
