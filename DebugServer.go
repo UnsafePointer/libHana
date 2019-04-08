@@ -11,6 +11,10 @@ typedef void (*AddBreakpointCallbackType)(unsigned int address);
 void callAddBreakpointCallback(AddBreakpointCallbackType callback, unsigned int address);
 typedef void (*ContinueCallbackType)();
 void callContinueCallback(ContinueCallbackType callback);
+typedef void (*AddLoadWatchpointCallbackType)(unsigned int address);
+void callAddLoadWatchpointCallback(AddLoadWatchpointCallbackType callback, unsigned int address);
+typedef void (*AddStoreWatchpointCallbackType)(unsigned int address);
+void callAddStoreWatchpointCallback(AddStoreWatchpointCallbackType callback, unsigned int address);
 */
 import "C"
 
@@ -40,6 +44,8 @@ var globalRegistersCallback C.GlobalRegistersCallbackType
 var readMemoryCallback C.MemoryReadCallbackType
 var addBreakpointCallback C.AddBreakpointCallbackType
 var continueCallback C.ContinueCallbackType
+var addLoadWatchpointCallback C.AddLoadWatchpointCallbackType
+var addStoreWatchpointCallback C.AddStoreWatchpointCallbackType
 var ackDisabled = false
 
 //export SetGlobalRegistersCallback
@@ -60,6 +66,16 @@ func SetAddBreakpointCallback(fn C.AddBreakpointCallbackType) {
 //export SetContinueCallback
 func SetContinueCallback(fn C.ContinueCallbackType) {
 	continueCallback = fn
+}
+
+//export SetAddLoadWatchpointCallback
+func SetAddLoadWatchpointCallback(fn C.AddLoadWatchpointCallbackType) {
+	addLoadWatchpointCallback = fn
+}
+
+//export SetAddStoreWatchpointCallback
+func SetAddStoreWatchpointCallback(fn C.AddStoreWatchpointCallbackType) {
+	addStoreWatchpointCallback = fn
 }
 
 //export NotifyStopped
@@ -196,11 +212,11 @@ func addBreakpoint(address uint32) {
 }
 
 func addLoadWatchpoint(address uint32) {
-
+	C.callAddLoadWatchpointCallback(addLoadWatchpointCallback, C.uint(address))
 }
 
 func addStoreWatchpoint(address uint32) {
-
+	C.callAddStoreWatchpointCallback(addStoreWatchpointCallback, C.uint(address))
 }
 
 func continueProgram(conn net.Conn) {

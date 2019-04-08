@@ -18,5 +18,13 @@ typedef void (*ContinueCallbackType)();
 void callContinueCallback(ContinueCallbackType callback) {
     return (callback)();
 }
+typedef void (*AddLoadWatchpointCallbackType)(unsigned int address);
+void callAddLoadWatchpointCallback(AddLoadWatchpointCallbackType callback, unsigned int address) {
+    return (callback)(address);
+}
+typedef void (*AddStoreWatchpointCallbackType)(unsigned int address);
+void callAddStoreWatchpointCallback(AddStoreWatchpointCallbackType callback, unsigned int address) {
+    return (callback)(address);
+}
 */
 import "C"
