@@ -15,6 +15,12 @@ typedef void (*AddLoadWatchpointCallbackType)(unsigned int address);
 void callAddLoadWatchpointCallback(AddLoadWatchpointCallbackType callback, unsigned int address);
 typedef void (*AddStoreWatchpointCallbackType)(unsigned int address);
 void callAddStoreWatchpointCallback(AddStoreWatchpointCallbackType callback, unsigned int address);
+typedef void (*RemoveBreakpointCallbackType)(unsigned int address);
+void callRemoveBreakpointCallback(RemoveBreakpointCallbackType callback, unsigned int address);
+typedef void (*RemoveLoadWatchpointCallbackType)(unsigned int address);
+void callRemoveLoadWatchpointCallback(RemoveLoadWatchpointCallbackType callback, unsigned int address);
+typedef void (*RemoveStoreWatchpointCallbackType)(unsigned int address);
+void callRemoveStoreWatchpointCallback(RemoveStoreWatchpointCallbackType callback, unsigned int address);
 */
 import "C"
 
@@ -46,6 +52,9 @@ var addBreakpointCallback C.AddBreakpointCallbackType
 var continueCallback C.ContinueCallbackType
 var addLoadWatchpointCallback C.AddLoadWatchpointCallbackType
 var addStoreWatchpointCallback C.AddStoreWatchpointCallbackType
+var removeBreakpointCallback C.RemoveBreakpointCallbackType
+var removeLoadWatchpointCallback C.RemoveLoadWatchpointCallbackType
+var removeStoreWatchpointCallback C.RemoveStoreWatchpointCallbackType
 var ackDisabled = false
 
 //export SetGlobalRegistersCallback
@@ -76,6 +85,21 @@ func SetAddLoadWatchpointCallback(fn C.AddLoadWatchpointCallbackType) {
 //export SetAddStoreWatchpointCallback
 func SetAddStoreWatchpointCallback(fn C.AddStoreWatchpointCallbackType) {
 	addStoreWatchpointCallback = fn
+}
+
+//export SetRemoveBreakpointCallback
+func SetRemoveBreakpointCallback(fn C.RemoveBreakpointCallbackType) {
+	removeBreakpointCallback = fn
+}
+
+//export SetRemoveLoadWatchpointCallback
+func SetRemoveLoadWatchpointCallback(fn C.RemoveLoadWatchpointCallbackType) {
+	removeLoadWatchpointCallback = fn
+}
+
+//export SetRemoveStoreWatchpointCallback
+func SetRemoveStoreWatchpointCallback(fn C.RemoveStoreWatchpointCallbackType) {
+	removeStoreWatchpointCallback = fn
 }
 
 //export NotifyStopped
@@ -219,6 +243,18 @@ func addStoreWatchpoint(address uint32) {
 	C.callAddStoreWatchpointCallback(addStoreWatchpointCallback, C.uint(address))
 }
 
+func removeBreakpoint(address uint32) {
+	C.callRemoveBreakpointCallback(removeBreakpointCallback, C.uint(address))
+}
+
+func removeLoadWatchpoint(address uint32) {
+	C.callRemoveLoadWatchpointCallback(removeLoadWatchpointCallback, C.uint(address))
+}
+
+func removeStoreWatchpoint(address uint32) {
+	C.callRemoveStoreWatchpointCallback(removeStoreWatchpointCallback, C.uint(address))
+}
+
 func continueProgram(conn net.Conn) {
 	C.callContinueCallback(continueCallback)
 	done = make(chan struct{})
@@ -273,6 +309,30 @@ func reply(conn net.Conn, packet string) {
 				send(conn, "OK")
 			case 3:
 				addStoreWatchpoint(uint32(address))
+				send(conn, "OK")
+			default:
+				send(conn, "")
+			}
+		} else if strings.HasPrefix(method, "z") {
+			params := strings.Split(method[1:], ",")
+			breakType, _ := strconv.ParseUint(params[0], 10, 32)
+			address, _ := strconv.ParseUint(params[1], 16, 32)
+			kind, _ := strconv.ParseUint(params[2], 10, 32)
+			if kind != 4 {
+				// libHana only supports MIPS 32-Bits
+				// https://sourceware.org/gdb/onlinedocs/gdb/MIPS-Breakpoint-Kinds.html
+				send(conn, "E00")
+				return
+			}
+			switch breakType {
+			case 0:
+				removeBreakpoint(uint32(address))
+				send(conn, "OK")
+			case 2:
+				removeLoadWatchpoint(uint32(address))
+				send(conn, "OK")
+			case 3:
+				removeStoreWatchpoint(uint32(address))
 				send(conn, "OK")
 			default:
 				send(conn, "")

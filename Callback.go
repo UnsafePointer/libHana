@@ -26,5 +26,17 @@ typedef void (*AddStoreWatchpointCallbackType)(unsigned int address);
 void callAddStoreWatchpointCallback(AddStoreWatchpointCallbackType callback, unsigned int address) {
     return (callback)(address);
 }
+typedef void (*RemoveBreakpointCallbackType)(unsigned int address);
+void callRemoveBreakpointCallback(RemoveBreakpointCallbackType callback, unsigned int address) {
+    return (callback)(address);
+}
+typedef void (*RemoveLoadWatchpointCallbackType)(unsigned int address);
+void callRemoveLoadWatchpointCallback(RemoveLoadWatchpointCallbackType callback, unsigned int address) {
+    return (callback)(address);
+}
+typedef void (*RemoveStoreWatchpointCallbackType)(unsigned int address);
+void callRemoveStoreWatchpointCallback(RemoveStoreWatchpointCallbackType callback, unsigned int address) {
+    return (callback)(address);
+}
 */
 import "C"
